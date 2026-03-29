@@ -6,6 +6,7 @@ const connectDB = require('./config/db');
 
 // Import Routes
 const marketplaceRoutes = require('./routes/marketplaceRoutes');
+const authRoutes = require('./routes/authRoutes');
 
 // Load enviornment variables
 dotenv.config();
@@ -23,12 +24,22 @@ app.use(cors()); // Enables Cross-Origin Resource Sharing
 // Make 'public/uploads' static so the mobile app can request the images over Http
 app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
 
-// Mount the Marketplace Routes
+// Mount the API Routes
 app.use('/api/marketplace', marketplaceRoutes);
+app.use('/api/auth', authRoutes);
 
 // Test Route
 app.get('/', (req, res) => {
   res.status(200).json({ message: 'Vehicle Management API is up and running!' });
+});
+
+// JSON Error Handling Middleware (Catches errors from express-async-handler)
+app.use((err, req, res, next) => {
+  const statusCode = res.statusCode === 200 ? 500 : res.statusCode;
+  res.status(statusCode).json({
+    message: err.message,
+    stack: process.env.NODE_ENV === 'production' ? null : err.stack,
+  });
 });
 
 // Configure Port

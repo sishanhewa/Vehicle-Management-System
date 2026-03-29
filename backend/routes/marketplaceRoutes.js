@@ -3,6 +3,7 @@ const router = express.Router();
 
 // Import the Multer upload middleware
 const upload = require('../middleware/uploadMiddleware');
+const { protect } = require('../middleware/authMiddleware');
 
 // Import Controllers
 const { 
@@ -10,7 +11,8 @@ const {
   getListingById, 
   createListing, 
   updateListing, 
-  deleteListing 
+  deleteListing,
+  getMyListings
 } = require('../controllers/marketplaceController');
 
 // Note: These routes are public to easily test via Postman while building.
@@ -18,12 +20,14 @@ const {
 
 router.route('/')
   .get(getListings) 
-  // Expects 'images' field in FormData. Allows up to 5 images per upload.
-  .post(upload.array('images', 5), createListing); 
+  .post(protect, upload.array('images', 5), createListing); 
+
+// Ad Management for Seller Dashboard
+router.get('/my-listings', protect, getMyListings);
 
 router.route('/:id')
   .get(getListingById)
-  .put(updateListing)
-  .delete(deleteListing);
+  .put(protect, upload.array('images', 5), updateListing)
+  .delete(protect, deleteListing);
 
 module.exports = router;
