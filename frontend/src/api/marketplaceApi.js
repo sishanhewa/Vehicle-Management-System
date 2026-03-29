@@ -22,3 +22,27 @@ export const createListing = async (formData) => {
   if (!response.ok) throw new Error('Failed to create listing');
   return response.json();
 };
+
+export const fetchMyListings = async () => {
+  const token = await SecureStore.getItemAsync('userToken');
+  const response = await fetch(`${API_URL}/my-listings`, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${token}`
+    }
+  });
+  if (!response.ok) throw new Error('Failed to fetch your listings');
+  return response.json();
+};
+
+export const deleteListingAPI = async (id) => {
+  const token = await SecureStore.getItemAsync('userToken');
+  const response = await fetch(`${API_URL}/${id}`, {
+    method: 'DELETE',
+    headers: {
+      'Authorization': `Bearer ${token}`
+    }
+  });
+  if (!response.ok) throw new Error('Failed to delete listing');
+  return response.json();
+};

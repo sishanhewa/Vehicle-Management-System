@@ -11,7 +11,8 @@ const {
   getListingById, 
   createListing, 
   updateListing, 
-  deleteListing 
+  deleteListing,
+  getMyListings
 } = require('../controllers/marketplaceController');
 
 // Note: These routes are public to easily test via Postman while building.
@@ -19,8 +20,10 @@ const {
 
 router.route('/')
   .get(getListings) 
-  // Now explicitly protected so only verified Seller Accounts can Post Ads
   .post(protect, upload.array('images', 5), createListing); 
+
+// Ad Management for Seller Dashboard
+router.get('/my-listings', protect, getMyListings);
 
 router.route('/:id')
   .get(getListingById)

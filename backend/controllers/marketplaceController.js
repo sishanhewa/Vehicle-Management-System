@@ -5,24 +5,53 @@ const VehicleListing = require('../models/VehicleListing');
 // @access  Public
 const getListings = async (req, res) => {
   try {
-    // Advanced Riyasewana Query Filtering Logic
-    const { make, location, minPrice, maxPrice } = req.query;
+    // Advanced 8-Field Query Filtering Logic
+    const { 
+      make, model, location, condition, fuelType, transmission, 
+      yearMin, yearMax, minPrice, maxPrice, bodyType, sellerId
+    } = req.query;
     
     // Base query only fetches Available vehicles
     let query = { status: 'Available' };
 
     // Dynamically append filters if user searches them
-    if (make) query.make = new RegExp(make, 'i'); // Case-insensitive Make Search
-    if (location && location !== 'All') query.location = location;
+    if (sellerId) query.sellerId = sellerId;
+    if (make && make !== 'Any Make') query.make = new RegExp(make, 'i');
+    if (model) query.model = new RegExp(model, 'i');
+    if (location && location !== 'Any City') query.location = location;
+    if (condition && condition !== 'Any Condition') query.condition = condition;
+    if (fuelType && fuelType !== 'Any Fuel') query.fuelType = fuelType;
+    if (transmission && transmission !== 'Any Gear') query.transmission = transmission;
+    if (bodyType && bodyType !== 'Any Type') query.bodyType = bodyType;
+
+    // Numerical Range Interception
     if (minPrice || maxPrice) {
       query.price = {};
       if (minPrice) query.price.$gte = Number(minPrice);
       if (maxPrice) query.price.$lte = Number(maxPrice);
     }
 
+    if (yearMin || yearMax) {
+      query.year = {};
+      if (yearMin) query.year.$gte = Number(yearMin);
+      if (yearMax) query.year.$lte = Number(yearMax);
+    }
+
     const listings = await VehicleListing.find(query)
       .sort({ createdAt: -1 })
-      .populate('sellerId', 'name phone'); // Attach Seller contact securely
+      .populate('sellerId', 'name phone'); 
+    res.status(200).json(listings);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Get listings for the logged in user (Seller Dashboard)
+// @route   GET /api/marketplace/my-listings
+// @access  Private
+const getMyListings = async (req, res) => {
+  try {
+    const listings = await VehicleListing.find({ sellerId: req.user._id }).sort({ createdAt: -1 });
     res.status(200).json(listings);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -114,4 +143,4 @@ const deleteListing = async (req, res) => {
   }
 };
 
-module.exports = { getListings, getListingById, createListing, updateListing, deleteListing };
+module.exports = { getListings, getListingById, createListing, updateListing, deleteListing, getMyListings };

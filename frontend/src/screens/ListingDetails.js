@@ -1,8 +1,9 @@
 import React from 'react';
 import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity, Linking } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 
 const ListingDetails = () => {
+  const router = useRouter();
   const { vehicle } = useLocalSearchParams();
   const data = vehicle ? JSON.parse(vehicle) : null;
 
@@ -81,13 +82,24 @@ const ListingDetails = () => {
         <Text style={styles.description}>{data.description || 'No detailed description provided by the seller.'}</Text>
         
         {/* Contact Block */}
-        <View style={styles.contactBlock}>
+        <TouchableOpacity 
+          style={styles.contactBlock}
+          onPress={() => router.push({
+            pathname: '/SellerProfile',
+            params: { 
+              sellerId: data.sellerId?._id,
+              sellerName: data.sellerId?.name,
+              sellerPhone: data.sellerId?.phone 
+            }
+          })}
+        >
+           <Text style={styles.viewProfile}>View Public Profile ➔</Text>
            <Text style={styles.sellerName}>Seller: {data.sellerId?.name || 'Private Seller'}</Text>
            <Text style={styles.sellerEmail}>{data.sellerId?.email || 'N/A'}</Text>
            <TouchableOpacity style={styles.callButton} onPress={handleCall}>
               <Text style={styles.callButtonText}>📞 Call {data.sellerId?.phone || 'Seller'}</Text>
            </TouchableOpacity>
-        </View>
+        </TouchableOpacity>
       </View>
     </ScrollView>
   );
@@ -113,6 +125,7 @@ const styles = StyleSheet.create({
   description: { fontSize: 16, color: '#555', lineHeight: 24, marginBottom: 30, backgroundColor: '#fff', padding: 15, borderRadius: 8, elevation: 2 },
 
   contactBlock: { backgroundColor: '#ecf0f1', padding: 20, borderRadius: 8, alignItems: 'center', marginBottom: 40 },
+  viewProfile: { fontSize: 12, color: '#3498db', fontWeight: 'bold', marginBottom: 10 },
   sellerName: { fontSize: 18, fontWeight: 'bold', color: '#2c3e50', marginBottom: 5 },
   sellerEmail: { fontSize: 14, color: '#7f8c8d', marginBottom: 15 },
   callButton: { backgroundColor: '#27ae60', paddingVertical: 15, paddingHorizontal: 30, borderRadius: 30, width: '100%', alignItems: 'center', elevation: 3 },
