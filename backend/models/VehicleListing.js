@@ -4,8 +4,7 @@ const vehicleListingSchema = new mongoose.Schema({
   sellerId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    // Temporarily false so we can test posting listings before the Auth module is built
-    required: false
+    required: true // Now fully enforced using JWT token payloads
   },
   title: { type: String, required: true },
   make: { type: String, required: true },
@@ -13,6 +12,12 @@ const vehicleListingSchema = new mongoose.Schema({
   year: { type: Number, required: true },
   price: { type: Number, required: true },
   mileage: { type: Number, required: true },
+  transmission: { type: String, enum: ['Manual', 'Automatic', 'Tiptronic'], required: true },
+  fuelType: { type: String, enum: ['Petrol', 'Diesel', 'Hybrid', 'Electric'], required: true },
+  engineCapacity: { type: Number, required: true },
+  bodyType: { type: String, required: true },
+  location: { type: String, required: true }, // e.g. Colombo, Kandy
+  isNegotiable: { type: Boolean, default: false },
   description: { type: String },
   images: [{ type: String }],
   condition: { 
