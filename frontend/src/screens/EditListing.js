@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Platform } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TextInput, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Platform, Image } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { updateListingAPI } from '../api/marketplaceApi';
+import { updateListingAPI, resolveImageUrl } from '../api/marketplaceApi';
 import { Picker } from '@react-native-picker/picker';
 import { Feather, Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 
 const LOCATIONS = ['Colombo', 'Kandy', 'Gampaha', 'Kurunegala', 'Kalutara', 'Galle', 'Matara', 'Ratnapura', 'Anuradhapura', 'Jaffna', 'Batticaloa', 'Badulla'];
 const BODY_TYPES = ['Sedan', 'Hatchback', 'SUV', 'Coupé', 'Van', 'Pickup', 'Jeep'];
@@ -32,6 +33,24 @@ const EditListing = () => {
   const [description, setDescription] = useState(data.description || '');
   const [isNegotiable, setIsNegotiable] = useState(data.isNegotiable ?? true);
   const [loading, setLoading] = useState(false);
+  const [selectedImages, setSelectedImages] = useState([]);
+
+  const pickImages = async () => {
+    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permissionResult.granted) {
+      Alert.alert("Permission Required", "Please allow photo access to upload images.");
+      return;
+    }
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsMultipleSelection: true,
+      selectionLimit: 5,
+      quality: 0.7,
+    });
+    if (!result.canceled && result.assets) {
+      setSelectedImages(result.assets);
+    }
+  };
 
   const handleUpdate = async () => {
     if (!make || !model || !year || !price) {
@@ -39,13 +58,37 @@ const EditListing = () => {
       return;
     }
     setLoading(true);
-    try {
-      await updateListingAPI(data._id, {
-        title: `${year} ${make} ${model}`, make, model,
-        year: Number(year), price: Number(price), mileage: Number(mileage),
-        engineCapacity: Number(engineCapacity), location, transmission,
-        fuelType, bodyType, condition, status, description, isNegotiable,
+
+    const formData = new FormData();
+    formData.append('title', `${year} ${make} ${model}`);
+    formData.append('make', make);
+    formData.append('model', model);
+    formData.append('year', year);
+    formData.append('price', price);
+    formData.append('mileage', mileage);
+    formData.append('engineCapacity', engineCapacity);
+    formData.append('location', location);
+    formData.append('transmission', transmission);
+    formData.append('fuelType', fuelType);
+    formData.append('bodyType', bodyType);
+    formData.append('condition', condition);
+    formData.append('status', status);
+    formData.append('description', description);
+    formData.append('isNegotiable', isNegotiable ? 'true' : 'false');
+
+    // Add new images only if selected
+    if (selectedImages.length > 0) {
+      selectedImages.forEach((img, i) => {
+        formData.append('images', {
+          uri: img.uri,
+          type: 'image/jpeg',
+          name: `edit-upload-${Date.now()}-${i}.jpg`
+        });
       });
+    }
+
+    try {
+      await updateListingAPI(data._id, formData);
       Alert.alert('Success', 'Listing updated successfully!');
       router.back();
     } catch (error) {
@@ -122,6 +165,38 @@ const EditListing = () => {
         value={description} onChangeText={setDescription}
       />
 
+      <Text style={styles.sectionTitle}>Images</Text>
+      <View style={styles.imageSection}>
+        {selectedImages.length === 0 && data.images && data.images.length > 0 && (
+          <View style={styles.currentImages}>
+            <Text style={styles.imageLabel}>Current Images:</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.imageScroll}>
+              {data.images.map((img, i) => (
+                <Image key={i} source={{ uri: resolveImageUrl(img) }} style={styles.previewImg} />
+              ))}
+            </ScrollView>
+          </View>
+        )}
+        {selectedImages.length > 0 && (
+          <View style={styles.newImages}>
+            <Text style={styles.imageLabel}>New Selection (Will replace old):</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.imageScroll}>
+              {selectedImages.map((img, i) => (
+                <Image key={i} source={{ uri: img.uri }} style={styles.previewImg} />
+              ))}
+            </ScrollView>
+          </View>
+        )}
+        <TouchableOpacity style={styles.imageBtn} activeOpacity={0.7} onPress={pickImages}>
+          <Feather name="camera" size={20} color={selectedImages.length > 0 ? "#10ac84" : "#636e72"} />
+          <Text style={[styles.imageBtnText, selectedImages.length > 0 && { color: '#10ac84' }]}>
+            {selectedImages.length > 0
+              ? `${selectedImages.length} new images selected`
+              : 'Replace All Images'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
       <TouchableOpacity style={styles.updateBtn} activeOpacity={0.85} onPress={handleUpdate} disabled={loading}>
         {loading ? <ActivityIndicator color="#fff" /> : (
           <>
@@ -140,7 +215,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, padding: 20, backgroundColor: '#fff' },
   header: { fontSize: 26, fontWeight: '800', color: '#1a1a2e', marginBottom: 4, letterSpacing: -0.3 },
   subText: { fontSize: 14, color: '#b2bec3', marginBottom: 24 },
-  sectionTitle: { fontSize: 15, fontWeight: '700', color: '#1a1a2e', marginBottom: 12, marginTop: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
+  sectionTitle: { fontSize: 15, fontWeight: '700', color: '#1a1a2e', marginBottom: 12, marginTop: 12, textTransform: 'uppercase', letterSpacing: 0.5 },
   row: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
   input: { backgroundColor: '#f8f9fa', borderRadius: 12, padding: 14, marginBottom: 12, fontSize: 15, color: '#1a1a2e', borderWidth: 1, borderColor: '#e9ecef' },
   textArea: { height: 110, textAlignVertical: 'top' },
@@ -155,8 +230,16 @@ const styles = StyleSheet.create({
   negoBtnActive: { backgroundColor: '#f0faf7', borderColor: '#10ac84' },
   negoTxt: { fontSize: 15, fontWeight: '700', color: '#636e72' },
 
+  imageSection: { marginBottom: 20 },
+  imageLabel: { fontSize: 12, color: '#b2bec3', fontWeight: '600', marginBottom: 10 },
+  imageScroll: { marginBottom: 15 },
+  previewImg: { width: 100, height: 100, borderRadius: 10, marginRight: 10, backgroundColor: '#f1f3f5' },
+  imageBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: '#f8f9fa', padding: 18, borderRadius: 14, borderWidth: 2, borderColor: '#e9ecef', borderStyle: 'dashed' },
+  imageBtnText: { color: '#636e72', fontSize: 15, fontWeight: '600' },
+
   updateBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: '#3498db', padding: 18, borderRadius: 14, ...Platform.select({ ios: { shadowColor: '#3498db', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 }, android: { elevation: 4 } }) },
   updateBtnTxt: { color: '#fff', fontSize: 17, fontWeight: '700' }
 });
 
 export default EditListing;
+

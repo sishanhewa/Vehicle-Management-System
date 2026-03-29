@@ -57,15 +57,14 @@ export const fetchMyListings = async () => {
   return response.json();
 };
 
-export const updateListingAPI = async (id, updateData) => {
+export const updateListingAPI = async (id, formData) => {
   const token = await SecureStore.getItemAsync('userToken');
   const response = await fetch(`${API_URL}/${id}`, {
     method: 'PUT',
     headers: {
-      'Content-Type': 'application/json',
       'Authorization': `Bearer ${token}`
     },
-    body: JSON.stringify(updateData),
+    body: formData,
   });
   if (!response.ok) {
     const errData = await response.json().catch(() => ({}));

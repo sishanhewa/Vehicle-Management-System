@@ -115,7 +115,24 @@ const updateListing = async (req, res) => {
       return res.status(401).json({message: 'Not authorized to edit this ad'});
     }
 
-    Object.assign(listing, req.body);
+    // Extract updated fields from req.body
+    const updateData = { ...req.body };
+
+    // Numerical conversion (FormData sends everything as strings)
+    if (updateData.year) updateData.year = Number(updateData.year);
+    if (updateData.price) updateData.price = Number(updateData.price);
+    if (updateData.mileage) updateData.mileage = Number(updateData.mileage);
+    if (updateData.engineCapacity) updateData.engineCapacity = Number(updateData.engineCapacity);
+    if (updateData.isNegotiable !== undefined) {
+      updateData.isNegotiable = updateData.isNegotiable === 'true' || updateData.isNegotiable === true;
+    }
+
+    // Handle new image uploads if provided
+    if (req.files && req.files.length > 0) {
+      updateData.images = req.files.map(file => `/uploads/${file.filename}`);
+    }
+
+    Object.assign(listing, updateData);
     const updatedListing = await listing.save();
     res.status(200).json(updatedListing);
   } catch (error) {

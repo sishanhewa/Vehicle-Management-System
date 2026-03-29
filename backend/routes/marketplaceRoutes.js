@@ -27,7 +27,7 @@ router.get('/my-listings', protect, getMyListings);
 
 router.route('/:id')
   .get(getListingById)
-  .put(protect, updateListing)
+  .put(protect, upload.array('images', 5), updateListing)
   .delete(protect, deleteListing);
 
 module.exports = router;
