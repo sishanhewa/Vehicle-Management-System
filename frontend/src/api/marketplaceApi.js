@@ -1,16 +1,22 @@
 // Connecting via the Android Emulator's dedicated Localhost Bridge
 export const API_URL = 'http://10.0.2.2:5000/api/marketplace';
+import * as SecureStore from 'expo-secure-store';
 
-export const fetchListings = async () => {
-  const response = await fetch(API_URL);
+export const fetchListings = async (queryParams = {}) => {
+  const params = new URLSearchParams(queryParams);
+  const response = await fetch(`${API_URL}?${params.toString()}`);
   if (!response.ok) throw new Error('Failed to fetch listings');
   return response.json();
 };
 
 export const createListing = async (formData) => {
+  const token = await SecureStore.getItemAsync('userToken');
+
   const response = await fetch(API_URL, {
     method: 'POST',
-    // We let the browser/fetch automatically boundary logic for multipart/form-data
+    headers: {
+      'Authorization': `Bearer ${token}`
+    },
     body: formData,
   });
   if (!response.ok) throw new Error('Failed to create listing');

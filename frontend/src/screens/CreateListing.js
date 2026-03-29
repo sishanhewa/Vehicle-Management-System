@@ -1,55 +1,66 @@
-import React, { useState } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { createListing } from '../api/marketplaceApi';
-
-// Import Expo Image Picker
 import * as ImagePicker from 'expo-image-picker';
+import { AuthContext } from '../context/AuthContext';
 
 const CreateListing = () => {
   const router = useRouter();
+  const { userInfo } = useContext(AuthContext);
+
+  // Core Data
   const [make, setMake] = useState('');
   const [model, setModel] = useState('');
   const [year, setYear] = useState('');
   const [price, setPrice] = useState('');
   const [mileage, setMileage] = useState('');
+  
+  // New Riyasewana Detailed Requirements
+  const [location, setLocation] = useState('');
+  const [engineCapacity, setEngineCapacity] = useState('');
+  const [transmission, setTransmission] = useState('Automatic');
+  const [fuelType, setFuelType] = useState('Petrol');
+  const [bodyType, setBodyType] = useState('Sedan');
+  
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
-
   const [selectedImage, setSelectedImage] = useState(null); 
 
-  // ----- IMAGE PICKER LOGIC -----
+  // Fast protection boot
+  useEffect(() => {
+    if (!userInfo) {
+       Alert.alert("Authentication Required", "You must log in to create a listing");
+       router.replace('/login');
+    }
+  }, [userInfo]);
+
   const pickImage = async () => {
-    // Request permission (needed on some devices)
     const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    
     if (permissionResult.granted === false) {
-      Alert.alert("Permission Required", "You've refused to allow this app to access your photos!");
+      Alert.alert("Permission Required", "Please allow photo access to upload images.");
       return;
     }
 
     let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'], // Use literal string 'images' internally mapped in newer Expo SDKs
+      mediaTypes: ['images'],
       allowsEditing: true,
       quality: 0.8,
     });
     
-    // Updated logic for newer versions of expo-image-picker
-    if (!result.canceled && result.assets && result.assets.length > 0) {
+    if (!result.canceled && result.assets) {
       setSelectedImage(result.assets[0]);
     }
   };
 
   const handleSubmit = async () => {
-    // Form validation check
-    if (!make || !model || !year || !price || !mileage) {
-      Alert.alert('Missing Fields', 'Please fill out all mandatory fields.');
+    if (!make || !model || !year || !price || !mileage || !location || !engineCapacity || !bodyType) {
+      Alert.alert('Missing Fields', 'Please carefully fill out all Riyasewana standard required fields.');
       return;
     }
 
     setLoading(true);
     
-    // Construct Multi-part Form Data for hitting our API Endpoint
     const formData = new FormData();
     formData.append('title', `${year} ${make} ${model}`);
     formData.append('make', make);
@@ -57,9 +68,15 @@ const CreateListing = () => {
     formData.append('year', year);
     formData.append('price', price);
     formData.append('mileage', mileage);
+    formData.append('location', location);
+    formData.append('engineCapacity', engineCapacity);
+    formData.append('transmission', transmission);
+    formData.append('fuelType', fuelType);
+    formData.append('bodyType', bodyType);
+    formData.append('isNegotiable', 'true');
+    
     if (description) formData.append('description', description);
     
-    // Convert selected device image into File Payload for the backend Multer Middleware
     if (selectedImage) {
       formData.append('images', {
         uri: selectedImage.uri,
@@ -71,9 +88,9 @@ const CreateListing = () => {
     try {
       await createListing(formData);
       Alert.alert('Success', 'Vehicle Listing Live on Marketplace!');
-      router.back(); // Navigate them back to the feed
+      router.back(); 
     } catch (error) {
-       Alert.alert('Network Error', error.message);
+       Alert.alert('Network Error', error.message || 'Cannot upload');
     } finally {
       setLoading(false);
     }
@@ -81,32 +98,48 @@ const CreateListing = () => {
 
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.header}>Sell Your Vehicle</Text>
+      <Text style={styles.header}>Post Free Ad</Text>
       
-      <TextInput style={styles.input} placeholder="Car Make (e.g. Honda)" placeholderTextColor="#999" value={make} onChangeText={setMake} />
-      <TextInput style={styles.input} placeholder="Model (e.g. Civic)" placeholderTextColor="#999" value={model} onChangeText={setModel} />
-      <TextInput style={styles.input} placeholder="Year (e.g. 2021)" placeholderTextColor="#999" keyboardType="numeric" value={year} onChangeText={setYear} />
-      <TextInput style={styles.input} placeholder="Price in Rs." placeholderTextColor="#999" keyboardType="numeric" value={price} onChangeText={setPrice} />
-      <TextInput style={styles.input} placeholder="Current Mileage" placeholderTextColor="#999" keyboardType="numeric" value={mileage} onChangeText={setMileage} />
+      <View style={styles.row}>
+        <TextInput style={[styles.input, {flex: 1, marginRight: 10}]} placeholder="Make (Toyota)" value={make} onChangeText={setMake} />
+        <TextInput style={[styles.input, {flex: 1}]} placeholder="Model (Prius)" value={model} onChangeText={setModel} />
+      </View>
+      
+      <TextInput style={styles.input} placeholder="Location (District/City)" value={location} onChangeText={setLocation} />
+      
+      <View style={styles.row}>
+         <TextInput style={[styles.input, {flex: 1, marginRight: 10}]} placeholder="Year (2020)" keyboardType="numeric" value={year} onChangeText={setYear} />
+         <TextInput style={[styles.input, {flex: 1}]} placeholder="Mileage (km)" keyboardType="numeric" value={mileage} onChangeText={setMileage} />
+      </View>
+      
+      <TextInput style={styles.input} placeholder="Price (Rs)" keyboardType="numeric" value={price} onChangeText={setPrice} />
+      
+      <View style={styles.row}>
+         <TextInput style={[styles.input, {flex: 1, marginRight: 10}]} placeholder="Engine CC (1500)" keyboardType="numeric" value={engineCapacity} onChangeText={setEngineCapacity} />
+         <TextInput style={[styles.input, {flex: 1}]} placeholder="Body Type (Sedan)" value={bodyType} onChangeText={setBodyType} />
+      </View>
+
+      {/* Basic text surrogates for dropdowns since native Web UI select boxes fail on Expo Go */}
+      <View style={styles.row}>
+         <TextInput style={[styles.input, {flex: 1, marginRight: 10}]} placeholder="Gear (Auto/Manual)" value={transmission} onChangeText={setTransmission} />
+         <TextInput style={[styles.input, {flex: 1}]} placeholder="Fuel (Petrol/Diesel)" value={fuelType} onChangeText={setFuelType} />
+      </View>
+
       <TextInput 
         style={[styles.input, styles.textArea]} 
         placeholder="Detailed Description (Optional)" 
-        placeholderTextColor="#999"
         multiline={true} 
         numberOfLines={4}
         value={description} 
         onChangeText={setDescription} 
       />
 
-      <TouchableOpacity 
-        style={styles.imageBtn} 
-        onPress={pickImage}
-      >
-        <Text style={styles.imageBtnText}>{selectedImage ? '✅ Image Selected' : '📸 Select Vehicle Image'}</Text>
+      <TouchableOpacity style={styles.imageBtn} onPress={pickImage}>
+        <Text style={styles.imageBtnText}>{selectedImage ? '✅ Image Prepared for Upload' : '📸 Select Vehicle Image'}</Text>
       </TouchableOpacity>
 
       <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit} disabled={loading}>
-        {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitBtnText}>Publish Listing</Text>}
+        {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitBtnText}>Post Listing Now</Text>}
       </TouchableOpacity>
     </ScrollView>
   );
@@ -114,12 +147,13 @@ const CreateListing = () => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 20, backgroundColor: '#fff' },
-  header: { fontSize: 28, fontWeight: '800', marginBottom: 25, color: '#2c3e50' },
-  input: { backgroundColor: '#f9f9f9', borderWidth: 1, borderColor: '#e0e0e0', borderRadius: 10, padding: 16, marginBottom: 15, fontSize: 16, color: '#333' },
-  textArea: { height: 120, textAlignVertical: 'top' },
-  imageBtn: { backgroundColor: '#edf2f7', padding: 18, borderRadius: 10, alignItems: 'center', marginBottom: 25, borderWidth: 2, borderColor: '#cbd5e0', borderStyle: 'dashed' },
-  imageBtnText: { color: '#4a5568', fontSize: 16, fontWeight: 'bold' },
-  submitBtn: { backgroundColor: '#27ae60', padding: 18, borderRadius: 10, alignItems: 'center', marginBottom: 50, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, elevation: 4 },
+  header: { fontSize: 28, fontWeight: '800', marginBottom: 25, color: '#e74c3c' },
+  row: { flexDirection: 'row', justifyContent: 'space-between' },
+  input: { backgroundColor: '#f2f2f2', borderRadius: 8, padding: 15, marginBottom: 15, fontSize: 16, color: '#333' },
+  textArea: { height: 100, textAlignVertical: 'top' },
+  imageBtn: { backgroundColor: '#eaebed', padding: 18, borderRadius: 10, alignItems: 'center', marginBottom: 25, borderWidth: 1, borderColor: '#bdc3c7', borderStyle: 'dashed' },
+  imageBtnText: { color: '#2c3e50', fontSize: 16, fontWeight: 'bold' },
+  submitBtn: { backgroundColor: '#e74c3c', padding: 18, borderRadius: 10, alignItems: 'center', marginBottom: 50, elevation: 4 },
   submitBtnText: { color: '#fff', fontSize: 18, fontWeight: 'bold' }
 });
 

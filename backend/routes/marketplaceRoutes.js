@@ -3,6 +3,7 @@ const router = express.Router();
 
 // Import the Multer upload middleware
 const upload = require('../middleware/uploadMiddleware');
+const { protect } = require('../middleware/authMiddleware');
 
 // Import Controllers
 const { 
@@ -18,12 +19,12 @@ const {
 
 router.route('/')
   .get(getListings) 
-  // Expects 'images' field in FormData. Allows up to 5 images per upload.
-  .post(upload.array('images', 5), createListing); 
+  // Now explicitly protected so only verified Seller Accounts can Post Ads
+  .post(protect, upload.array('images', 5), createListing); 
 
 router.route('/:id')
   .get(getListingById)
-  .put(updateListing)
-  .delete(deleteListing);
+  .put(protect, updateListing)
+  .delete(protect, deleteListing);
 
 module.exports = router;
