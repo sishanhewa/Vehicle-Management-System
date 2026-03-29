@@ -74,7 +74,7 @@ const getListingById = async (req, res) => {
 
 // @desc    Create a new vehicle listing
 // @route   POST /api/marketplace
-// @access  Public (Will be Private later)
+// @access  Private (JWT Required)
 const createListing = async (req, res) => {
   try {
     const { 
@@ -104,7 +104,7 @@ const createListing = async (req, res) => {
 
 // @desc    Update a vehicle listing
 // @route   PUT /api/marketplace/:id
-// @access  Public (Will be Private later)
+// @access  Private (JWT Required)
 const updateListing = async (req, res) => {
   try {
     const listing = await VehicleListing.findById(req.params.id);
@@ -112,7 +112,7 @@ const updateListing = async (req, res) => {
 
     // Validate Seller Ownership Strictly
     if (listing.sellerId.toString() !== req.user._id.toString()) {
-      return res.status(401).json({message: 'Not authorized to edit this App'});
+      return res.status(401).json({message: 'Not authorized to edit this ad'});
     }
 
     Object.assign(listing, req.body);
@@ -125,7 +125,7 @@ const updateListing = async (req, res) => {
 
 // @desc    Delete a vehicle listing
 // @route   DELETE /api/marketplace/:id
-// @access  Public (Will be Private later)
+// @access  Private (JWT Required)
 const deleteListing = async (req, res) => {
   try {
     const listing = await VehicleListing.findById(req.params.id);

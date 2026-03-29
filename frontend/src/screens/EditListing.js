@@ -1,9 +1,7 @@
-import React, { useState, useContext, useEffect } from 'react';
+import React, { useState } from 'react';
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Platform } from 'react-native';
-import { useRouter } from 'expo-router';
-import { createListing } from '../api/marketplaceApi';
-import * as ImagePicker from 'expo-image-picker';
-import { AuthContext } from '../context/AuthContext';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { updateListingAPI } from '../api/marketplaceApi';
 import { Picker } from '@react-native-picker/picker';
 import { Feather, Ionicons } from '@expo/vector-icons';
 
@@ -12,79 +10,46 @@ const BODY_TYPES = ['Sedan', 'Hatchback', 'SUV', 'Coupé', 'Van', 'Pickup', 'Jee
 const TRANSMISSIONS = ['Automatic', 'Manual', 'Tiptronic'];
 const FUEL_TYPES = ['Petrol', 'Diesel', 'Hybrid', 'Electric'];
 const CONDITIONS = ['Used', 'New', 'Reconditioned'];
+const STATUSES = ['Available', 'Sold'];
 
-const CreateListing = () => {
+const EditListing = () => {
   const router = useRouter();
-  const { userInfo } = useContext(AuthContext);
+  const { vehicle } = useLocalSearchParams();
+  const data = vehicle ? JSON.parse(vehicle) : {};
 
-  const [make, setMake] = useState('');
-  const [model, setModel] = useState('');
-  const [year, setYear] = useState('');
-  const [price, setPrice] = useState('');
-  const [mileage, setMileage] = useState('');
-  const [location, setLocation] = useState(LOCATIONS[0]);
-  const [engineCapacity, setEngineCapacity] = useState('');
-  const [transmission, setTransmission] = useState(TRANSMISSIONS[0]);
-  const [fuelType, setFuelType] = useState(FUEL_TYPES[0]);
-  const [bodyType, setBodyType] = useState(BODY_TYPES[0]);
-  const [condition, setCondition] = useState(CONDITIONS[0]);
-  const [isNegotiable, setIsNegotiable] = useState(true);
-  const [description, setDescription] = useState('');
+  const [make, setMake] = useState(data.make || '');
+  const [model, setModel] = useState(data.model || '');
+  const [year, setYear] = useState(String(data.year || ''));
+  const [price, setPrice] = useState(String(data.price || ''));
+  const [mileage, setMileage] = useState(String(data.mileage || ''));
+  const [engineCapacity, setEngineCapacity] = useState(String(data.engineCapacity || ''));
+  const [location, setLocation] = useState(data.location || LOCATIONS[0]);
+  const [transmission, setTransmission] = useState(data.transmission || TRANSMISSIONS[0]);
+  const [fuelType, setFuelType] = useState(data.fuelType || FUEL_TYPES[0]);
+  const [bodyType, setBodyType] = useState(data.bodyType || BODY_TYPES[0]);
+  const [condition, setCondition] = useState(data.condition || CONDITIONS[0]);
+  const [status, setStatus] = useState(data.status || 'Available');
+  const [description, setDescription] = useState(data.description || '');
+  const [isNegotiable, setIsNegotiable] = useState(data.isNegotiable ?? true);
   const [loading, setLoading] = useState(false);
-  const [selectedImages, setSelectedImages] = useState([]);
 
-  useEffect(() => {
-    if (!userInfo) {
-      Alert.alert("Authentication Required", "You must log in to create a listing.");
-      router.replace('/login');
-    }
-  }, [userInfo]);
-
-  const pickImages = async () => {
-    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permissionResult.granted) {
-      Alert.alert("Permission Required", "Please allow photo access to upload images.");
-      return;
-    }
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsMultipleSelection: true,
-      selectionLimit: 5,
-      quality: 0.7,
-    });
-    if (!result.canceled && result.assets) setSelectedImages(result.assets);
-  };
-
-  const handleSubmit = async () => {
-    if (!make || !model || !year || !price || !mileage || !engineCapacity) {
-      Alert.alert('Missing Fields', 'Please fill: Make, Model, Year, Price, Mileage, Engine CC.');
+  const handleUpdate = async () => {
+    if (!make || !model || !year || !price) {
+      Alert.alert('Missing Fields', 'Make, Model, Year and Price are required.');
       return;
     }
     setLoading(true);
-    const formData = new FormData();
-    formData.append('title', `${year} ${make} ${model}`);
-    formData.append('make', make);
-    formData.append('model', model);
-    formData.append('year', year);
-    formData.append('price', price);
-    formData.append('mileage', mileage);
-    formData.append('location', location);
-    formData.append('engineCapacity', engineCapacity);
-    formData.append('transmission', transmission);
-    formData.append('fuelType', fuelType);
-    formData.append('bodyType', bodyType);
-    formData.append('condition', condition);
-    formData.append('isNegotiable', isNegotiable ? 'true' : 'false');
-    if (description) formData.append('description', description);
-    selectedImages.forEach((img, i) => {
-      formData.append('images', { uri: img.uri, type: 'image/jpeg', name: `upload-${Date.now()}-${i}.jpg` });
-    });
     try {
-      await createListing(formData);
-      Alert.alert('Success', 'Your vehicle listing is now live!');
+      await updateListingAPI(data._id, {
+        title: `${year} ${make} ${model}`, make, model,
+        year: Number(year), price: Number(price), mileage: Number(mileage),
+        engineCapacity: Number(engineCapacity), location, transmission,
+        fuelType, bodyType, condition, status, description, isNegotiable,
+      });
+      Alert.alert('Success', 'Listing updated successfully!');
       router.back();
     } catch (error) {
-      Alert.alert('Upload Failed', error.message || 'Something went wrong');
+      Alert.alert('Update Failed', error.message);
     } finally {
       setLoading(false);
     }
@@ -106,13 +71,13 @@ const CreateListing = () => {
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      <Text style={styles.header}>Post Free Ad</Text>
-      <Text style={styles.subText}>Fill in vehicle details to list on the marketplace</Text>
+      <Text style={styles.header}>Edit Listing</Text>
+      <Text style={styles.subText}>Modify your vehicle listing details</Text>
 
       <Text style={styles.sectionTitle}>Vehicle Information</Text>
       <View style={styles.row}>
-        <TextInput style={[styles.input, { flex: 1, marginRight: 8 }]} placeholder="Make (e.g. Toyota)" placeholderTextColor="#b2bec3" value={make} onChangeText={setMake} />
-        <TextInput style={[styles.input, { flex: 1 }]} placeholder="Model (e.g. Prius)" placeholderTextColor="#b2bec3" value={model} onChangeText={setModel} />
+        <TextInput style={[styles.input, { flex: 1, marginRight: 8 }]} placeholder="Make" placeholderTextColor="#b2bec3" value={make} onChangeText={setMake} />
+        <TextInput style={[styles.input, { flex: 1 }]} placeholder="Model" placeholderTextColor="#b2bec3" value={model} onChangeText={setModel} />
       </View>
       <View style={styles.row}>
         <TextInput style={[styles.input, { flex: 1, marginRight: 8 }]} placeholder="Year" placeholderTextColor="#b2bec3" keyboardType="numeric" value={year} onChangeText={setYear} />
@@ -132,7 +97,10 @@ const CreateListing = () => {
         <PickerField label="Body Type" icon="cube-outline" selectedValue={bodyType} onValueChange={setBodyType} items={BODY_TYPES} />
         <PickerField label="Condition" icon="shield-checkmark-outline" selectedValue={condition} onValueChange={setCondition} items={CONDITIONS} />
       </View>
-      <PickerField label="Location" icon="location-outline" selectedValue={location} onValueChange={setLocation} items={LOCATIONS} />
+      <View style={styles.row}>
+        <PickerField label="Location" icon="location-outline" selectedValue={location} onValueChange={setLocation} items={LOCATIONS} />
+        <PickerField label="Status" icon="checkmark-circle-outline" selectedValue={status} onValueChange={setStatus} items={STATUSES} />
+      </View>
 
       <TouchableOpacity
         style={[styles.negoBtn, isNegotiable && styles.negoBtnActive]}
@@ -148,26 +116,17 @@ const CreateListing = () => {
       <Text style={styles.sectionTitle}>Description</Text>
       <TextInput
         style={[styles.input, styles.textArea]}
-        placeholder="Detailed vehicle description (optional but recommended)"
+        placeholder="Vehicle description"
         placeholderTextColor="#b2bec3"
         multiline numberOfLines={5}
         value={description} onChangeText={setDescription}
       />
 
-      <TouchableOpacity style={styles.imageBtn} activeOpacity={0.7} onPress={pickImages}>
-        <Feather name="camera" size={20} color={selectedImages.length > 0 ? "#10ac84" : "#636e72"} />
-        <Text style={[styles.imageBtnText, selectedImages.length > 0 && { color: '#10ac84' }]}>
-          {selectedImages.length > 0
-            ? `${selectedImages.length} image${selectedImages.length > 1 ? 's' : ''} selected`
-            : 'Select Vehicle Images (up to 5)'}
-        </Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.submitBtn} activeOpacity={0.85} onPress={handleSubmit} disabled={loading}>
+      <TouchableOpacity style={styles.updateBtn} activeOpacity={0.85} onPress={handleUpdate} disabled={loading}>
         {loading ? <ActivityIndicator color="#fff" /> : (
           <>
-            <Feather name="send" size={18} color="#fff" />
-            <Text style={styles.submitBtnText}>Post Listing Now</Text>
+            <Feather name="save" size={18} color="#fff" />
+            <Text style={styles.updateBtnTxt}>Save Changes</Text>
           </>
         )}
       </TouchableOpacity>
@@ -196,10 +155,8 @@ const styles = StyleSheet.create({
   negoBtnActive: { backgroundColor: '#f0faf7', borderColor: '#10ac84' },
   negoTxt: { fontSize: 15, fontWeight: '700', color: '#636e72' },
 
-  imageBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: '#f8f9fa', padding: 18, borderRadius: 14, marginBottom: 20, borderWidth: 2, borderColor: '#e9ecef', borderStyle: 'dashed' },
-  imageBtnText: { color: '#636e72', fontSize: 15, fontWeight: '600' },
-  submitBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: '#10ac84', padding: 18, borderRadius: 14, ...Platform.select({ ios: { shadowColor: '#10ac84', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 }, android: { elevation: 4 } }) },
-  submitBtnText: { color: '#fff', fontSize: 17, fontWeight: '700' }
+  updateBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: '#3498db', padding: 18, borderRadius: 14, ...Platform.select({ ios: { shadowColor: '#3498db', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 }, android: { elevation: 4 } }) },
+  updateBtnTxt: { color: '#fff', fontSize: 17, fontWeight: '700' }
 });
 
-export default CreateListing;
+export default EditListing;

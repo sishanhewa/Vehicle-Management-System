@@ -18,6 +18,13 @@ export default function RootLayout() {
       <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
         <Stack>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="login" options={{ title: 'Login', presentation: 'modal' }} />
+          <Stack.Screen name="register" options={{ title: 'Register', presentation: 'modal' }} />
+          <Stack.Screen name="CreateListing" options={{ title: 'Post Free Ad' }} />
+          <Stack.Screen name="ListingDetails" options={{ title: 'Vehicle Details' }} />
+          <Stack.Screen name="ManageAds" options={{ title: 'Seller Dashboard' }} />
+          <Stack.Screen name="SellerProfile" options={{ title: 'Seller Profile' }} />
+          <Stack.Screen name="EditListing" options={{ title: 'Edit Listing' }} />
           <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
         </Stack>
         <StatusBar style="auto" />

@@ -1,41 +1,45 @@
-import React, { useEffect, useState, useContext } from 'react';
-import { View, Text, FlatList, Image, StyleSheet, TouchableOpacity, ActivityIndicator, TextInput, ScrollView, Animated } from 'react-native';
-import { useRouter } from 'expo-router';
-import { fetchListings } from '../api/marketplaceApi';
+import React, { useEffect, useState, useContext, useCallback } from 'react';
+import { View, Text, FlatList, Image, StyleSheet, TouchableOpacity, ActivityIndicator, TextInput, StatusBar, Platform } from 'react-native';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { fetchListings, resolveImageUrl } from '../api/marketplaceApi';
 import { AuthContext } from '../context/AuthContext';
 import { Picker } from '@react-native-picker/picker';
+import { Ionicons, Feather } from '@expo/vector-icons';
+
+const MAKES = ['Any Make', 'Toyota', 'Honda', 'Suzuki', 'Nissan', 'Mitsubishi', 'Hyundai', 'Kia', 'Mercedes-Benz', 'BMW', 'Audi'];
+const BODY_TYPES = ['Any Type', 'Sedan', 'Hatchback', 'SUV', 'Coupé', 'Van', 'Pickup', 'Jeep'];
+const CONDITIONS = ['Any Condition', 'New', 'Used', 'Reconditioned'];
+const LOCATIONS = ['Any City', 'Colombo', 'Kandy', 'Gampaha', 'Kurunegala', 'Kalutara', 'Galle', 'Matara', 'Ratnapura', 'Anuradhapura', 'Jaffna', 'Batticaloa', 'Badulla'];
+const FUEL_TYPES = ['Any Fuel', 'Petrol', 'Diesel', 'Hybrid', 'Electric'];
+const TRANSMISSIONS = ['Any Gear', 'Automatic', 'Manual', 'Tiptronic'];
+
+const DEFAULT_FILTERS = {
+  make: 'Any Make', model: '', bodyType: 'Any Type', condition: 'Any Condition',
+  location: 'Any City', fuelType: 'Any Fuel', transmission: 'Any Gear',
+  yearMin: '', yearMax: '', minPrice: '', maxPrice: ''
+};
 
 const MarketplaceFeed = () => {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { userInfo, logout } = useContext(AuthContext);
   const [vehicles, setVehicles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState({ ...DEFAULT_FILTERS });
+  const [resultCount, setResultCount] = useState(0);
 
-  // Advanced Search State (8+ Fields)
-  const [filters, setFilters] = useState({
-    make: 'Any Make',
-    model: '',
-    bodyType: 'Any Type',
-    condition: 'Any Condition',
-    location: 'Any City',
-    fuelType: 'Any Fuel',
-    transmission: 'Any Gear',
-    yearMin: '',
-    yearMax: '',
-    minPrice: '',
-    maxPrice: ''
-  });
-
-  useEffect(() => {
-    loadVehicles();
-  }, []);
+  useFocusEffect(
+    useCallback(() => { loadVehicles(); }, [])
+  );
 
   const loadVehicles = async () => {
     setLoading(true);
     try {
       const data = await fetchListings(filters);
       setVehicles(data);
+      setResultCount(data.length);
     } catch (error) {
       console.error("Fetch Feed Error: ", error);
     } finally {
@@ -47,47 +51,95 @@ const MarketplaceFeed = () => {
     setFilters(prev => ({ ...prev, [key]: value }));
   };
 
-  const renderItem = ({ item }) => (
-    <TouchableOpacity 
-      style={styles.card} 
-      onPress={() => router.push({ pathname: '/ListingDetails', params: { vehicle: JSON.stringify(item) } })}
-    >
-      <Image 
-        source={{ uri: item.images && item.images.length > 0 
-          ? `http://10.0.2.2:5000${item.images[0]}` 
-          : 'https://via.placeholder.com/400x200?text=No+Image' }} 
-        style={styles.image} 
-      />
-      <View style={styles.infoRow}>
-         <View>
-            <Text style={styles.title}>{item.year} {item.make} {item.model}</Text>
-            <Text style={styles.locationTxt}>📍 {item.location}</Text>
-         </View>
-         <Text style={styles.price}>Rs. {item.price.toLocaleString()}</Text>
-      </View>
-      <View style={styles.tagRow}>
-         <Text style={styles.tag}>{item.transmission}</Text>
-         <Text style={styles.tag}>{item.fuelType}</Text>
-         <Text style={styles.tag}>{item.mileage}km</Text>
-      </View>
-    </TouchableOpacity>
+  const clearFilters = () => {
+    setFilters({ ...DEFAULT_FILTERS });
+  };
+
+  const renderPickerRow = (stateKey, options) => (
+    <View style={styles.pickerWrapper}>
+      <Picker
+        selectedValue={filters[stateKey]}
+        onValueChange={(v) => handleFilterChange(stateKey, v)}
+        style={styles.picker}
+        dropdownIconColor="#636e72"
+      >
+        {options.map(opt => <Picker.Item key={opt} label={opt} value={opt} />)}
+      </Picker>
+    </View>
   );
 
+  const renderItem = ({ item }) => {
+    const imageUri = item.images && item.images.length > 0
+      ? resolveImageUrl(item.images[0])
+      : 'https://via.placeholder.com/400x200?text=No+Image';
+
+    return (
+      <TouchableOpacity
+        style={styles.card}
+        activeOpacity={0.7}
+        onPress={() => router.push({ pathname: '/ListingDetails', params: { vehicleId: item._id, vehicle: JSON.stringify(item) } })}
+      >
+        <Image source={{ uri: imageUri }} style={styles.cardImage} />
+        {item.isNegotiable && (
+          <View style={styles.negoBadge}>
+            <Text style={styles.negoBadgeTxt}>Negotiable</Text>
+          </View>
+        )}
+        <View style={styles.cardBody}>
+          <View style={styles.cardTitleRow}>
+            <Text style={styles.cardTitle} numberOfLines={1}>{item.year} {item.make} {item.model}</Text>
+            <Text style={styles.cardPrice}>Rs. {Number(item.price).toLocaleString()}</Text>
+          </View>
+          <View style={styles.cardLocationRow}>
+            <Ionicons name="location-outline" size={13} color="#636e72" />
+            <Text style={styles.cardLocation}>{item.location || 'Unknown'}</Text>
+          </View>
+          <View style={styles.cardTagRow}>
+            <View style={styles.cardTag}>
+              <Ionicons name="cog-outline" size={12} color="#636e72" />
+              <Text style={styles.cardTagTxt}>{item.transmission}</Text>
+            </View>
+            <View style={styles.cardTag}>
+              <Ionicons name="water-outline" size={12} color="#636e72" />
+              <Text style={styles.cardTagTxt}>{item.fuelType}</Text>
+            </View>
+            <View style={styles.cardTag}>
+              <Ionicons name="speedometer-outline" size={12} color="#636e72" />
+              <Text style={styles.cardTagTxt}>{Number(item.mileage).toLocaleString()} km</Text>
+            </View>
+            {item.engineCapacity && (
+              <View style={styles.cardTag}>
+                <Ionicons name="flash-outline" size={12} color="#636e72" />
+                <Text style={styles.cardTagTxt}>{item.engineCapacity}cc</Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
   return (
-    <View style={styles.container}>
-      {/* Premium Header */}
-      <View style={styles.headerArea}>
-        <View style={styles.topRow}>
-          <Text style={styles.logo}>Vehicle<Text style={styles.logoRed}>Market</Text></Text>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.headerTop}>
+          <Text style={styles.logo}>Vehicle<Text style={styles.logoAccent}>Market</Text></Text>
           {userInfo ? (
             <View style={styles.authRow}>
-              <TouchableOpacity onPress={() => router.push('/ManageAds')} style={styles.dashboardBtn}>
-                <Text style={styles.dashboardBtnTxt}>Seller Dashboard</Text>
+              <TouchableOpacity onPress={() => router.push('/ManageAds')} style={styles.myAdsBtn}>
+                <Feather name="grid" size={15} color="#fff" />
+                <Text style={styles.myAdsBtnTxt}>My Ads</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={logout}><Text style={styles.logoutTxt}>Logout</Text></TouchableOpacity>
+              <TouchableOpacity onPress={logout} style={styles.logoutBtn}>
+                <Feather name="log-out" size={16} color="#e74c3c" />
+              </TouchableOpacity>
             </View>
           ) : (
             <TouchableOpacity onPress={() => router.push('/login')} style={styles.loginBtn}>
+              <Feather name="user" size={15} color="#fff" />
               <Text style={styles.loginBtnTxt}>Login</Text>
             </TouchableOpacity>
           )}
@@ -95,105 +147,79 @@ const MarketplaceFeed = () => {
 
         <Text style={styles.subHeader}>Find The Best Vehicle For You</Text>
 
-        {/* Advanced Filter Toggle */}
-        <TouchableOpacity 
-          style={styles.filterToggle} 
+        <TouchableOpacity
+          style={styles.filterToggle}
+          activeOpacity={0.7}
           onPress={() => setShowFilters(!showFilters)}
         >
+          <Feather name={showFilters ? "chevron-up" : "sliders"} size={16} color="#10ac84" />
           <Text style={styles.filterToggleTxt}>
-            {showFilters ? '▲ Hide Advanced Search' : '▼ Show Advanced Search Filters'}
+            {showFilters ? 'Hide Filters' : 'Advanced Search'}
           </Text>
         </TouchableOpacity>
 
         {showFilters && (
-          <View style={styles.advancedFilterBox}>
+          <View style={styles.filterBox}>
             <View style={styles.filterGrid}>
-              {/* Row 1 */}
-              <View style={styles.pickerWrapper}>
-                <Picker selectedValue={filters.make} onValueChange={(v) => handleFilterChange('make', v)} style={styles.picker}>
-                  <Picker.Item label="Any Make" value="Any Make" />
-                  <Picker.Item label="Toyota" value="Toyota" />
-                  <Picker.Item label="Honda" value="Honda" />
-                  <Picker.Item label="Suzuki" value="Suzuki" />
-                </Picker>
-              </View>
-              <TextInput style={styles.filterInput} placeholder="Model (Civic...)" value={filters.model} onChangeText={(v) => handleFilterChange('model', v)} />
-              <View style={styles.pickerWrapper}>
-                <Picker selectedValue={filters.bodyType} onValueChange={(v) => handleFilterChange('bodyType', v)} style={styles.picker}>
-                  <Picker.Item label="Any Type" value="Any Type" />
-                  <Picker.Item label="Sedan" value="Sedan" />
-                  <Picker.Item label="Hatchback" value="Hatchback" />
-                  <Picker.Item label="SUV" value="SUV" />
-                </Picker>
-              </View>
-              
-              {/* Row 2 */}
-              <View style={styles.pickerWrapper}>
-                <Picker selectedValue={filters.condition} onValueChange={(v) => handleFilterChange('condition', v)} style={styles.picker}>
-                  <Picker.Item label="Any Condition" value="Any Condition" />
-                  <Picker.Item label="Used" value="Used" />
-                  <Picker.Item label="New" value="New" />
-                </Picker>
-              </View>
-              <View style={styles.pickerWrapper}>
-                <Picker selectedValue={filters.location} onValueChange={(v) => handleFilterChange('location', v)} style={styles.picker}>
-                  <Picker.Item label="Any City" value="Any City" />
-                  <Picker.Item label="Colombo" value="Colombo" />
-                  <Picker.Item label="Kandy" value="Kandy" />
-                  <Picker.Item label="Gampaha" value="Gampaha" />
-                </Picker>
-              </View>
-              <View style={styles.pickerWrapper}>
-                <Picker selectedValue={filters.fuelType} onValueChange={(v) => handleFilterChange('fuelType', v)} style={styles.picker}>
-                  <Picker.Item label="Any Fuel" value="Any Fuel" />
-                  <Picker.Item label="Petrol" value="Petrol" />
-                  <Picker.Item label="Diesel" value="Diesel" />
-                  <Picker.Item label="Hybrid" value="Hybrid" />
-                </Picker>
-              </View>
-
-              {/* Row 3 */}
-              <View style={styles.pickerWrapper}>
-                <Picker selectedValue={filters.transmission} onValueChange={(v) => handleFilterChange('transmission', v)} style={styles.picker}>
-                  <Picker.Item label="Any Gear" value="Any Gear" />
-                  <Picker.Item label="Automatic" value="Automatic" />
-                  <Picker.Item label="Manual" value="Manual" />
-                </Picker>
-              </View>
-              <TextInput style={styles.filterInput} placeholder="Year Min" keyboardType="numeric" value={filters.yearMin} onChangeText={(v) => handleFilterChange('yearMin', v)} />
-              <TextInput style={styles.filterInput} placeholder="Year Max" keyboardType="numeric" value={filters.yearMax} onChangeText={(v) => handleFilterChange('yearMax', v)} />
-
-              {/* Row 4 */}
-              <TextInput style={styles.filterInput} placeholder="Min Price" keyboardType="numeric" value={filters.minPrice} onChangeText={(v) => handleFilterChange('minPrice', v)} />
-              <TextInput style={styles.filterInput} placeholder="Max Price" keyboardType="numeric" value={filters.maxPrice} onChangeText={(v) => handleFilterChange('maxPrice', v)} />
-              
-              <TouchableOpacity style={styles.searchBtn} onPress={loadVehicles}>
-                <Text style={styles.searchBtnTxt}>🔍 Search Vehicles</Text>
+              {renderPickerRow('make', MAKES)}
+              <TextInput style={styles.filterInput} placeholder="Model (e.g. Corolla)" placeholderTextColor="#b2bec3" value={filters.model} onChangeText={(v) => handleFilterChange('model', v)} />
+              {renderPickerRow('bodyType', BODY_TYPES)}
+              {renderPickerRow('condition', CONDITIONS)}
+              {renderPickerRow('location', LOCATIONS)}
+              {renderPickerRow('fuelType', FUEL_TYPES)}
+              {renderPickerRow('transmission', TRANSMISSIONS)}
+              <TextInput style={styles.filterInput} placeholder="Year Min" placeholderTextColor="#b2bec3" keyboardType="numeric" value={filters.yearMin} onChangeText={(v) => handleFilterChange('yearMin', v)} />
+              <TextInput style={styles.filterInput} placeholder="Year Max" placeholderTextColor="#b2bec3" keyboardType="numeric" value={filters.yearMax} onChangeText={(v) => handleFilterChange('yearMax', v)} />
+              <TextInput style={styles.filterInput} placeholder="Min Price (Rs)" placeholderTextColor="#b2bec3" keyboardType="numeric" value={filters.minPrice} onChangeText={(v) => handleFilterChange('minPrice', v)} />
+              <TextInput style={styles.filterInput} placeholder="Max Price (Rs)" placeholderTextColor="#b2bec3" keyboardType="numeric" value={filters.maxPrice} onChangeText={(v) => handleFilterChange('maxPrice', v)} />
+              <TouchableOpacity style={styles.searchBtn} activeOpacity={0.8} onPress={loadVehicles}>
+                <Feather name="search" size={18} color="#fff" />
+                <Text style={styles.searchBtnTxt}>Search Vehicles</Text>
               </TouchableOpacity>
             </View>
           </View>
         )}
       </View>
 
+      {/* Result Bar */}
+      {!loading && (
+        <View style={styles.resultBar}>
+          <Text style={styles.resultTxt}>{resultCount} vehicle{resultCount !== 1 ? 's' : ''} found</Text>
+          <TouchableOpacity onPress={() => { clearFilters(); setTimeout(loadVehicles, 100); }} style={styles.clearRow}>
+            <Feather name="x-circle" size={14} color="#e74c3c" />
+            <Text style={styles.clearTxt}>Clear</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Content */}
       {loading ? (
-         <ActivityIndicator size="large" color="#10ac84" style={styles.loader} />
+        <View style={styles.loaderWrap}>
+          <ActivityIndicator size="large" color="#10ac84" />
+          <Text style={styles.loaderTxt}>Loading vehicles...</Text>
+        </View>
       ) : vehicles.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>No vehicles match your search.</Text>
-          <TouchableOpacity onPress={() => setFilters({ make: 'Any Make', model: '', bodyType: 'Any Type', condition: 'Any Condition', location: 'Any City', fuelType: 'Any Fuel', transmission: 'Any Gear', yearMin: '', yearMax: '', minPrice: '', maxPrice: '' })}><Text style={styles.resetTxt}>Clear All Filters</Text></TouchableOpacity>
+          <Ionicons name="car-sport-outline" size={64} color="#dfe6e9" />
+          <Text style={styles.emptyText}>No vehicles match your search</Text>
+          <TouchableOpacity style={styles.clearAllBtn} onPress={() => { clearFilters(); setTimeout(loadVehicles, 100); }}>
+            <Text style={styles.clearAllBtnTxt}>Clear All Filters</Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <FlatList
           data={vehicles}
           keyExtractor={(item) => item._id}
           renderItem={renderItem}
-          contentContainerStyle={{ padding: 12, paddingBottom: 100 }}
+          contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+          showsVerticalScrollIndicator={false}
         />
       )}
-      
+
+      {/* FAB */}
       {userInfo && (
-        <TouchableOpacity style={styles.fab} onPress={() => router.push('/CreateListing')}>
-          <Text style={styles.fabIcon}>+</Text>
+        <TouchableOpacity style={styles.fab} activeOpacity={0.85} onPress={() => router.push('/CreateListing')}>
+          <Feather name="plus" size={26} color="#fff" />
         </TouchableOpacity>
       )}
     </View>
@@ -201,46 +227,64 @@ const MarketplaceFeed = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f6fa' },
-  headerArea: { padding: 15, backgroundColor: '#fff', elevation: 5, borderBottomWidth: 1, borderBottomColor: '#eee' },
-  topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 },
-  logo: { fontSize: 22, fontWeight: '900', color: '#2d3436' },
-  logoRed: { color: '#e74c3c' },
-  authRow: { flexDirection: 'row', alignItems: 'center', gap: 15 },
-  dashboardBtn: { backgroundColor: '#2d3436', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 6 },
-  dashboardBtnTxt: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
-  logoutTxt: { color: '#e74c3c', fontSize: 12, fontWeight: 'bold' },
-  loginBtn: { backgroundColor: '#e74c3c', paddingVertical: 8, paddingHorizontal: 18, borderRadius: 20 },
-  loginBtnTxt: { color: '#fff', fontWeight: 'bold' },
-  
-  subHeader: { fontSize: 18, fontWeight: 'bold', color: '#2d3436', textAlign: 'center', marginBottom: 10 },
-  filterToggle: { padding: 10, backgroundColor: '#f1f2f6', borderRadius: 8, alignItems: 'center', marginBottom: 10 },
-  filterToggleTxt: { color: '#2f3542', fontWeight: 'bold', fontSize: 14 },
+  container: { flex: 1, backgroundColor: '#f8f9fa' },
 
-  advancedFilterBox: { backgroundColor: '#f9f9f9', padding: 10, borderRadius: 10, borderWidth: 1, borderColor: '#ecf0f1' },
+  // Header
+  header: { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 16, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#eee', ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6 }, android: { elevation: 4 } }) },
+  headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  logo: { fontSize: 24, fontWeight: '800', color: '#1a1a2e', letterSpacing: -0.5 },
+  logoAccent: { color: '#10ac84' },
+  authRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  myAdsBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#1a1a2e', paddingVertical: 8, paddingHorizontal: 14, borderRadius: 20 },
+  myAdsBtnTxt: { color: '#fff', fontSize: 13, fontWeight: '600' },
+  logoutBtn: { padding: 8, borderRadius: 20, backgroundColor: '#fff0f0' },
+  loginBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#10ac84', paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20 },
+  loginBtnTxt: { color: '#fff', fontWeight: '600', fontSize: 13 },
+
+  subHeader: { fontSize: 18, fontWeight: '700', color: '#1a1a2e', textAlign: 'center', marginBottom: 14 },
+  filterToggle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 12, backgroundColor: '#f0faf7', borderRadius: 10, borderWidth: 1, borderColor: '#d4edda' },
+  filterToggleTxt: { color: '#10ac84', fontWeight: '700', fontSize: 14 },
+
+  // Filters
+  filterBox: { marginTop: 14, backgroundColor: '#fafbfc', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: '#e9ecef' },
   filterGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  pickerWrapper: { flex: 1, minWidth: '30%', backgroundColor: '#fff', borderRadius: 8, borderWidth: 1, borderColor: '#dfe6e9', height: 45, justifyContent: 'center' },
-  picker: { height: 45 },
-  filterInput: { flex: 1, minWidth: '30%', backgroundColor: '#fff', borderRadius: 8, borderWidth: 1, borderColor: '#dfe6e9', paddingHorizontal: 10, height: 45 },
-  searchBtn: { flex: 1, minWidth: '60%', backgroundColor: '#10ac84', borderRadius: 8, height: 45, justifyContent: 'center', alignItems: 'center', flexDirection: 'row', marginTop: 5 },
-  searchBtnTxt: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+  pickerWrapper: { flex: 1, minWidth: '30%', backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: '#dee2e6', height: 46, justifyContent: 'center', overflow: 'hidden' },
+  picker: { height: 46, color: '#2d3436' },
+  filterInput: { flex: 1, minWidth: '30%', backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: '#dee2e6', paddingHorizontal: 14, height: 46, fontSize: 14, color: '#2d3436' },
+  searchBtn: { flex: 1, minWidth: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#10ac84', borderRadius: 10, height: 48, marginTop: 4, ...Platform.select({ ios: { shadowColor: '#10ac84', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 }, android: { elevation: 4 } }) },
+  searchBtnTxt: { color: '#fff', fontWeight: '700', fontSize: 16 },
 
-  loader: { flex: 1 },
+  // Result Bar
+  resultBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 10, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#eee' },
+  resultTxt: { color: '#636e72', fontSize: 13, fontWeight: '600' },
+  clearRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  clearTxt: { color: '#e74c3c', fontSize: 13, fontWeight: '600' },
+
+  // Loading & Empty
+  loaderWrap: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  loaderTxt: { marginTop: 12, color: '#b2bec3', fontSize: 14 },
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
-  emptyText: { fontSize: 16, color: '#7f8c8d', marginBottom: 20 },
-  resetTxt: { color: '#3498db', fontWeight: 'bold' },
+  emptyText: { fontSize: 16, color: '#636e72', marginTop: 16, marginBottom: 20 },
+  clearAllBtn: { backgroundColor: '#10ac84', paddingVertical: 12, paddingHorizontal: 28, borderRadius: 25 },
+  clearAllBtnTxt: { color: '#fff', fontWeight: '700' },
 
-  card: { backgroundColor: '#fff', borderRadius: 15, overflow: 'hidden', marginBottom: 20, elevation: 3 },
-  image: { width: '100%', height: 200, resizeMode: 'cover' },
-  infoRow: { paddingHorizontal: 15, paddingTop: 15, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  title: { fontSize: 18, fontWeight: 'bold', color: '#2d3436', flex: 1 },
-  locationTxt: { fontSize: 13, color: '#7f8c8d', marginTop: 3 },
-  price: { fontSize: 18, color: '#e74c3c', fontWeight: 'bold' },
-  tagRow: { flexDirection: 'row', padding: 15, gap: 10 },
-  tag: { backgroundColor: '#f1f2f6', paddingVertical: 4, paddingHorizontal: 10, borderRadius: 5, fontSize: 11, color: '#57606f', fontWeight: 'bold' },
+  // Cards
+  card: { backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden', marginBottom: 16, ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 12 }, android: { elevation: 3 } }) },
+  cardImage: { width: '100%', height: 180, resizeMode: 'cover' },
+  negoBadge: { position: 'absolute', top: 12, left: 12, backgroundColor: 'rgba(16, 172, 132, 0.9)', paddingVertical: 4, paddingHorizontal: 10, borderRadius: 6 },
+  negoBadgeTxt: { color: '#fff', fontSize: 11, fontWeight: '700' },
+  cardBody: { padding: 16 },
+  cardTitleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 },
+  cardTitle: { fontSize: 16, fontWeight: '700', color: '#1a1a2e', flex: 1, marginRight: 10 },
+  cardPrice: { fontSize: 17, color: '#e74c3c', fontWeight: '800' },
+  cardLocationRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 10 },
+  cardLocation: { fontSize: 13, color: '#636e72' },
+  cardTagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  cardTag: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#f1f3f5', paddingVertical: 5, paddingHorizontal: 10, borderRadius: 6 },
+  cardTagTxt: { fontSize: 11, color: '#636e72', fontWeight: '600' },
 
-  fab: { position: 'absolute', width: 60, height: 60, alignItems: 'center', justifyContent: 'center', right: 20, bottom: 20, backgroundColor: '#10ac84', borderRadius: 30, elevation: 6 },
-  fabIcon: { fontSize: 32, color: 'white', lineHeight: 34 }
+  // FAB
+  fab: { position: 'absolute', width: 56, height: 56, alignItems: 'center', justifyContent: 'center', right: 20, bottom: 24, backgroundColor: '#10ac84', borderRadius: 28, ...Platform.select({ ios: { shadowColor: '#10ac84', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 10 }, android: { elevation: 8 } }) },
 });
 
 export default MarketplaceFeed;

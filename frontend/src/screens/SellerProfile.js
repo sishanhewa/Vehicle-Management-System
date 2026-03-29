@@ -1,101 +1,123 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, Image, StyleSheet, TouchableOpacity, ActivityIndicator, Linking } from 'react-native';
+import { View, Text, FlatList, Image, StyleSheet, TouchableOpacity, ActivityIndicator, Linking, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { fetchListings } from '../api/marketplaceApi';
+import { fetchListings, resolveImageUrl } from '../api/marketplaceApi';
+import { Feather, Ionicons } from '@expo/vector-icons';
 
 const SellerProfile = () => {
-    const { sellerId, sellerName, sellerPhone } = useLocalSearchParams();
-    const router = useRouter();
-    const [vehicles, setVehicles] = useState([]);
-    const [loading, setLoading] = useState(true);
+  const { sellerId, sellerName, sellerPhone } = useLocalSearchParams();
+  const router = useRouter();
+  const [vehicles, setVehicles] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        loadSellerVehicles();
-    }, [sellerId]);
+  useEffect(() => {
+    if (sellerId) loadSellerVehicles();
+  }, [sellerId]);
 
-    const loadSellerVehicles = async () => {
-        setLoading(true);
-        try {
-            // Fetch all listings for this specific seller ID
-            // We'll need the backend to support ?sellerId= filter in getListings
-            const data = await fetchListings({ sellerId });
-            setVehicles(data);
-        } catch (error) {
-            console.error("Fetch Seller Profile Error: ", error);
-        } finally {
-            setLoading(false);
-        }
-    };
+  const loadSellerVehicles = async () => {
+    setLoading(true);
+    try {
+      const data = await fetchListings({ sellerId });
+      setVehicles(data);
+    } catch (error) {
+      console.error("Fetch Seller Profile Error: ", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    const handleCall = () => {
-        if (sellerPhone) Linking.openURL(`tel:${sellerPhone}`);
-    };
+  const handleCall = () => {
+    if (sellerPhone) Linking.openURL(`tel:${sellerPhone}`);
+  };
 
-    const renderItem = ({ item }) => (
-        <TouchableOpacity 
-          style={styles.card} 
-          onPress={() => router.push({ pathname: '/ListingDetails', params: { vehicle: JSON.stringify(item) } })}
-        >
-          <Image 
-            source={{ uri: item.images && item.images.length > 0 
-              ? `http://10.0.2.2:5000${item.images[0]}` 
-              : 'https://via.placeholder.com/400x200?text=No+Image' }} 
-            style={styles.image} 
-          />
-          <View style={styles.info}>
-            <Text style={styles.title}>{item.year} {item.make} {item.model}</Text>
-            <Text style={styles.price}>Rs. {item.price.toLocaleString()}</Text>
-          </View>
-        </TouchableOpacity>
-    );
+  const renderItem = ({ item }) => {
+    const imageUri = item.images && item.images.length > 0
+      ? resolveImageUrl(item.images[0])
+      : 'https://via.placeholder.com/200x120?text=No+Image';
 
     return (
-        <View style={styles.container}>
-            <View style={styles.profileHeader}>
-                <View style={styles.avatar}>
-                   <Text style={styles.avatarTxt}>{sellerName ? sellerName.charAt(0) : 'S'}</Text>
-                </View>
-                <Text style={styles.name}>{sellerName || 'Verified Seller'}</Text>
-                <TouchableOpacity style={styles.callBtn} onPress={handleCall}>
-                   <Text style={styles.callBtnTxt}>📞 Contact Seller</Text>
-                </TouchableOpacity>
-            </View>
-
-            <Text style={styles.sectionTitle}>Listings by {sellerName || 'this Seller'}</Text>
-
-            {loading ? (
-                <ActivityIndicator size="large" color="#3498db" />
-            ) : vehicles.length === 0 ? (
-                <Text style={styles.empty}>No active listings found for this seller.</Text>
-            ) : (
-                <FlatList
-                    data={vehicles}
-                    keyExtractor={(item) => item._id}
-                    renderItem={renderItem}
-                    numColumns={2}
-                    contentContainerStyle={styles.list}
-                />
-            )}
+      <TouchableOpacity
+        style={styles.card}
+        activeOpacity={0.7}
+        onPress={() => router.push({ pathname: '/ListingDetails', params: { vehicle: JSON.stringify(item) } })}
+      >
+        <Image source={{ uri: imageUri }} style={styles.cardImage} />
+        <View style={styles.cardInfo}>
+          <Text style={styles.cardTitle} numberOfLines={1}>{item.year} {item.make} {item.model}</Text>
+          <Text style={styles.cardPrice}>Rs. {Number(item.price).toLocaleString()}</Text>
+          <View style={styles.cardMetaRow}>
+            <Ionicons name="location-outline" size={12} color="#b2bec3" />
+            <Text style={styles.cardMeta}>{item.location}</Text>
+          </View>
         </View>
+      </TouchableOpacity>
     );
+  };
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.profileHeader}>
+        <View style={styles.avatar}>
+          <Text style={styles.avatarTxt}>
+            {sellerName ? sellerName.charAt(0).toUpperCase() : 'S'}
+          </Text>
+        </View>
+        <Text style={styles.name}>{sellerName || 'Verified Seller'}</Text>
+        {sellerPhone && (
+          <TouchableOpacity style={styles.callBtn} activeOpacity={0.7} onPress={handleCall}>
+            <Feather name="phone" size={16} color="#fff" />
+            <Text style={styles.callBtnTxt}>{sellerPhone}</Text>
+          </TouchableOpacity>
+        )}
+        <Text style={styles.listingCount}>
+          {loading ? '...' : `${vehicles.length} active listing${vehicles.length !== 1 ? 's' : ''}`}
+        </Text>
+      </View>
+
+      {loading ? (
+        <View style={styles.loaderWrap}>
+          <ActivityIndicator size="large" color="#3498db" />
+        </View>
+      ) : vehicles.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <Ionicons name="car-sport-outline" size={48} color="#dfe6e9" />
+          <Text style={styles.emptyText}>No active listings from this seller</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={vehicles}
+          keyExtractor={(item) => item._id}
+          renderItem={renderItem}
+          contentContainerStyle={{ padding: 16, paddingBottom: 30 }}
+          showsVerticalScrollIndicator={false}
+        />
+      )}
+    </View>
+  );
 };
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#fff' },
-    profileHeader: { padding: 30, alignItems: 'center', backgroundColor: '#f9f9f9', borderBottomWidth: 1, borderBottomColor: '#eee' },
-    avatar: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#3498db', justifyContent: 'center', alignItems: 'center', marginBottom: 15 },
-    avatarTxt: { fontSize: 32, color: '#fff', fontWeight: 'bold' },
-    name: { fontSize: 22, fontWeight: 'bold', color: '#2c3e50', marginBottom: 15 },
-    callBtn: { backgroundColor: '#2ecc71', paddingVertical: 10, paddingHorizontal: 20, borderRadius: 25 },
-    callBtnTxt: { color: '#fff', fontWeight: 'bold' },
-    sectionTitle: { fontSize: 18, fontWeight: 'bold', padding: 20, color: '#2c3e50' },
-    list: { padding: 10 },
-    card: { flex: 0.5, margin: 5, backgroundColor: '#fff', borderRadius: 10, elevation: 3, overflow: 'hidden' },
-    image: { width: '100%', height: 100 },
-    info: { padding: 10 },
-    title: { fontSize: 13, fontWeight: 'bold', color: '#333' },
-    price: { fontSize: 13, color: '#e74c3c', fontWeight: 'bold' },
-    empty: { textAlign: 'center', marginTop: 20, color: '#7f8c8d' }
+  container: { flex: 1, backgroundColor: '#f8f9fa' },
+  profileHeader: { paddingVertical: 30, paddingHorizontal: 20, alignItems: 'center', backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#eee', ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8 }, android: { elevation: 3 } }) },
+  avatar: { width: 72, height: 72, borderRadius: 36, backgroundColor: '#3498db', justifyContent: 'center', alignItems: 'center', marginBottom: 14 },
+  avatarTxt: { fontSize: 30, color: '#fff', fontWeight: '700' },
+  name: { fontSize: 22, fontWeight: '800', color: '#1a1a2e', marginBottom: 12 },
+  callBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#10ac84', paddingVertical: 10, paddingHorizontal: 22, borderRadius: 25, marginBottom: 10 },
+  callBtnTxt: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  listingCount: { fontSize: 13, color: '#b2bec3', fontWeight: '600' },
+
+  loaderWrap: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+
+  card: { backgroundColor: '#fff', borderRadius: 14, overflow: 'hidden', marginBottom: 12, ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8 }, android: { elevation: 2 } }) },
+  cardImage: { width: '100%', height: 150, resizeMode: 'cover' },
+  cardInfo: { padding: 14 },
+  cardTitle: { fontSize: 15, fontWeight: '700', color: '#1a1a2e', marginBottom: 4 },
+  cardPrice: { fontSize: 15, color: '#e74c3c', fontWeight: '800', marginBottom: 4 },
+  cardMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  cardMeta: { fontSize: 12, color: '#b2bec3' },
+
+  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
+  emptyText: { fontSize: 15, color: '#636e72', marginTop: 12 }
 });
 
 export default SellerProfile;

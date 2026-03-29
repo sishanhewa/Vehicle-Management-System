@@ -1,112 +1,128 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import React, { useContext } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform } from 'react-native';
+import { AuthContext } from '../../src/context/AuthContext';
+import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Feather, Ionicons } from '@expo/vector-icons';
 
-import { Collapsible } from '@/components/ui/collapsible';
-import { ExternalLink } from '@/components/external-link';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Fonts } from '@/constants/theme';
+export default function ProfileTab() {
+  const { userInfo, logout } = useContext(AuthContext);
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
 
-export default function TabTwoScreen() {
+  if (!userInfo) {
+    return (
+      <View style={[styles.guestContainer, { paddingTop: insets.top }]}>
+        <View style={styles.guestIconWrap}>
+          <Feather name="user" size={40} color="#b2bec3" />
+        </View>
+        <Text style={styles.guestTitle}>Welcome to VehicleMarket</Text>
+        <Text style={styles.guestText}>Login or create an account to manage your listings and track your ads</Text>
+        <TouchableOpacity style={styles.guestLoginBtn} activeOpacity={0.8} onPress={() => router.push('/login')}>
+          <Feather name="log-in" size={18} color="#fff" />
+          <Text style={styles.guestLoginBtnTxt}>Login</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.guestRegBtn} activeOpacity={0.7} onPress={() => router.push('/register')}>
+          <Text style={styles.guestRegBtnTxt}>Create Account</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  const MenuItem = ({ icon, title, subtitle, onPress, iconColor = '#1a1a2e' }) => (
+    <TouchableOpacity style={styles.menuItem} activeOpacity={0.6} onPress={onPress}>
+      <View style={[styles.menuIconWrap, { backgroundColor: `${iconColor}10` }]}>
+        <Feather name={icon} size={20} color={iconColor} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.menuTitle}>{title}</Text>
+        <Text style={styles.menuSub}>{subtitle}</Text>
+      </View>
+      <Feather name="chevron-right" size={18} color="#dfe6e9" />
+    </TouchableOpacity>
+  );
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#D0D0D0', dark: '#353636' }}
-      headerImage={
-        <IconSymbol
-          size={310}
-          color="#808080"
-          name="chevron.left.forwardslash.chevron.right"
-          style={styles.headerImage}
+    <ScrollView style={[styles.container, { paddingTop: insets.top }]} showsVerticalScrollIndicator={false}>
+      {/* Profile Header */}
+      <View style={styles.profileHeader}>
+        <View style={styles.avatar}>
+          <Text style={styles.avatarTxt}>{userInfo.name?.charAt(0).toUpperCase() || 'U'}</Text>
+        </View>
+        <Text style={styles.name}>{userInfo.name}</Text>
+        <Text style={styles.email}>{userInfo.email}</Text>
+        {userInfo.phone && (
+          <View style={styles.phoneRow}>
+            <Feather name="phone" size={13} color="#b2bec3" />
+            <Text style={styles.phone}>{userInfo.phone}</Text>
+          </View>
+        )}
+      </View>
+
+      {/* Menu */}
+      <View style={styles.menu}>
+        <MenuItem
+          icon="grid"
+          title="My Listings"
+          subtitle="Manage your active and sold vehicle ads"
+          onPress={() => router.push('/ManageAds')}
+          iconColor="#3498db"
         />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText
-          type="title"
-          style={{
-            fontFamily: Fonts.rounded,
-          }}>
-          Explore
-        </ThemedText>
-      </ThemedView>
-      <ThemedText>This app includes example code to help you get started.</ThemedText>
-      <Collapsible title="File-based routing">
-        <ThemedText>
-          This app has two screens:{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/explore.tsx</ThemedText>
-        </ThemedText>
-        <ThemedText>
-          The layout file in <ThemedText type="defaultSemiBold">app/(tabs)/_layout.tsx</ThemedText>{' '}
-          sets up the tab navigator.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/router/introduction">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Android, iOS, and web support">
-        <ThemedText>
-          You can open this project on Android, iOS, and the web. To open the web version, press{' '}
-          <ThemedText type="defaultSemiBold">w</ThemedText> in the terminal running this project.
-        </ThemedText>
-      </Collapsible>
-      <Collapsible title="Images">
-        <ThemedText>
-          For static images, you can use the <ThemedText type="defaultSemiBold">@2x</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">@3x</ThemedText> suffixes to provide files for
-          different screen densities
-        </ThemedText>
-        <Image
-          source={require('@/assets/images/react-logo.png')}
-          style={{ width: 100, height: 100, alignSelf: 'center' }}
+        <MenuItem
+          icon="plus-circle"
+          title="Post New Ad"
+          subtitle="List a new vehicle on the marketplace"
+          onPress={() => router.push('/CreateListing')}
+          iconColor="#10ac84"
         />
-        <ExternalLink href="https://reactnative.dev/docs/images">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Light and dark mode components">
-        <ThemedText>
-          This template has light and dark mode support. The{' '}
-          <ThemedText type="defaultSemiBold">useColorScheme()</ThemedText> hook lets you inspect
-          what the user&apos;s current color scheme is, and so you can adjust UI colors accordingly.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/develop/user-interface/color-themes/">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Animations">
-        <ThemedText>
-          This template includes an example of an animated component. The{' '}
-          <ThemedText type="defaultSemiBold">components/HelloWave.tsx</ThemedText> component uses
-          the powerful{' '}
-          <ThemedText type="defaultSemiBold" style={{ fontFamily: Fonts.mono }}>
-            react-native-reanimated
-          </ThemedText>{' '}
-          library to create a waving hand animation.
-        </ThemedText>
-        {Platform.select({
-          ios: (
-            <ThemedText>
-              The <ThemedText type="defaultSemiBold">components/ParallaxScrollView.tsx</ThemedText>{' '}
-              component provides a parallax effect for the header image.
-            </ThemedText>
-          ),
-        })}
-      </Collapsible>
-    </ParallaxScrollView>
+        <MenuItem
+          icon="user"
+          title="Public Profile"
+          subtitle="See how buyers view your profile"
+          onPress={() => router.push({
+            pathname: '/SellerProfile',
+            params: { sellerId: userInfo._id, sellerName: userInfo.name, sellerPhone: userInfo.phone }
+          })}
+          iconColor="#9b59b6"
+        />
+      </View>
+
+      {/* Logout */}
+      <TouchableOpacity style={styles.logoutBtn} activeOpacity={0.7} onPress={logout}>
+        <Feather name="log-out" size={18} color="#e74c3c" />
+        <Text style={styles.logoutTxt}>Logout</Text>
+      </TouchableOpacity>
+
+      <View style={{ height: 40 }} />
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  headerImage: {
-    color: '#808080',
-    bottom: -90,
-    left: -35,
-    position: 'absolute',
-  },
-  titleContainer: {
-    flexDirection: 'row',
-    gap: 8,
-  },
+  container: { flex: 1, backgroundColor: '#f8f9fa' },
+  guestContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 30, backgroundColor: '#f8f9fa' },
+  guestIconWrap: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#f1f3f5', justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
+  guestTitle: { fontSize: 22, fontWeight: '800', color: '#1a1a2e', marginBottom: 8 },
+  guestText: { fontSize: 14, color: '#b2bec3', textAlign: 'center', marginBottom: 30, lineHeight: 22 },
+  guestLoginBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#10ac84', paddingVertical: 14, paddingHorizontal: 50, borderRadius: 25, marginBottom: 14, width: '80%', justifyContent: 'center' },
+  guestLoginBtnTxt: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  guestRegBtn: { borderWidth: 2, borderColor: '#10ac84', paddingVertical: 12, paddingHorizontal: 50, borderRadius: 25, width: '80%', alignItems: 'center' },
+  guestRegBtnTxt: { color: '#10ac84', fontWeight: '700', fontSize: 16 },
+
+  profileHeader: { alignItems: 'center', paddingVertical: 30, paddingHorizontal: 20, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#eee' },
+  avatar: { width: 72, height: 72, borderRadius: 36, backgroundColor: '#3498db', justifyContent: 'center', alignItems: 'center', marginBottom: 14, ...Platform.select({ ios: { shadowColor: '#3498db', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8 }, android: { elevation: 4 } }) },
+  avatarTxt: { fontSize: 30, color: '#fff', fontWeight: '700' },
+  name: { fontSize: 22, fontWeight: '800', color: '#1a1a2e', marginBottom: 4 },
+  email: { fontSize: 14, color: '#b2bec3', marginBottom: 4 },
+  phoneRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  phone: { fontSize: 14, color: '#b2bec3' },
+
+  menu: { backgroundColor: '#fff', marginTop: 16, marginHorizontal: 16, borderRadius: 16, overflow: 'hidden', ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 10 }, android: { elevation: 2 } }) },
+  menuItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, paddingHorizontal: 18, borderBottomWidth: 1, borderBottomColor: '#f8f9fa' },
+  menuIconWrap: { width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginRight: 14 },
+  menuTitle: { fontSize: 15, fontWeight: '700', color: '#1a1a2e' },
+  menuSub: { fontSize: 12, color: '#b2bec3', marginTop: 2 },
+
+  logoutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, margin: 20, padding: 16, backgroundColor: '#fff', borderRadius: 14, borderWidth: 1, borderColor: '#fce4e4', ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 6 }, android: { elevation: 1 } }) },
+  logoutTxt: { color: '#e74c3c', fontWeight: '700', fontSize: 16 }
 });
